@@ -23,6 +23,7 @@
 #include "lua.h"
 
 #include "lauxlib.h"
+#include "lrotable.h"
 
 
 #define FREELIST_REF	0	/* free list of references */
@@ -155,6 +156,20 @@ LUALIB_API void luaL_checkany (lua_State *L, int narg) {
 }
 
 
+LUALIB_API void luaL_checkanytable (lua_State *L, int narg) {
+  int t = lua_type(L, narg);
+  if (t != LUA_TTABLE && t != LUA_TROTABLE)
+    tag_error(L, narg, LUA_TTABLE);
+}
+
+
+LUALIB_API void luaL_checkanyfunction (lua_State *L, int narg) {
+  int t = lua_type(L, narg);
+  if (t != LUA_TFUNCTION && t != LUA_TLIGHTFUNCTION)
+    tag_error(L, narg, LUA_TFUNCTION);
+}
+
+
 LUALIB_API const char *luaL_checklstring (lua_State *L, int narg, size_t *len) {
   const char *s = lua_tolstring(L, narg, len);
   if (!s) tag_error(L, narg, LUA_TSTRING);
@@ -229,6 +244,19 @@ LUALIB_API int luaL_callmeta (lua_State *L, int obj, const char *event) {
 LUALIB_API void (luaL_register) (lua_State *L, const char *libname,
                                 const luaL_Reg *l) {
   luaI_openlib(L, libname, l, 0);
+}
+
+
+LUALIB_API void luaL_register_ro (lua_State *L, const char *libname,
+                                  const luaR_table *table) {
+  lua_pushrotable(L, cast(void *, table));
+  lua_pushvalue(L, -1);
+  lua_setglobal(L, libname);
+  luaL_findtable(L, LUA_REGISTRYINDEX, "_LOADED", 1);
+  lua_pushvalue(L, -2);
+  lua_setfield(L, -2, libname);
+  lua_pop(L, 2);
+  lua_pushrotable(L, cast(void *, table));  /* return the module table */
 }
 
 

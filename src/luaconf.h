@@ -758,6 +758,20 @@ union luai_Cast { double l_d; long l_l; };
 */
 
 
-
+/*
+** Optional 32-bit TValue packing (NaN boxing).  It halves the size of a
+** TValue and of a table Node, but requires 32-bit pointers, 64-bit doubles
+** and a little-endian machine.  Define LUA_NO_PACK_VALUE to opt out.
+*/
+#if !defined(LUA_PACK_VALUE) && !defined(LUA_NO_PACK_VALUE) && \
+    defined(LUA_NUMBER_DOUBLE)
+#if defined(_M_IX86) || defined(__i386__) || defined(__arm__) || defined(_M_ARM)
+#if !defined(_WIN64) && !defined(__x86_64__) && !defined(__aarch64__) && \
+    !defined(__ARMEB__)
+#define LUA_PACK_VALUE
+#endif
+#endif
 #endif
 
+
+#endif

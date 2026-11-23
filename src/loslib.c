@@ -18,6 +18,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lrotable.h"
 
 
 static int os_pushresult (lua_State *L, int i, const char *filename) {
@@ -217,27 +218,29 @@ static int os_exit (lua_State *L) {
   exit(luaL_optint(L, 1, EXIT_SUCCESS));
 }
 
-static const luaL_Reg syslib[] = {
-  {"clock",     os_clock},
-  {"date",      os_date},
-  {"difftime",  os_difftime},
-  {"execute",   os_execute},
-  {"exit",      os_exit},
-  {"getenv",    os_getenv},
-  {"remove",    os_remove},
-  {"rename",    os_rename},
-  {"setlocale", os_setlocale},
-  {"time",      os_time},
-  {"tmpname",   os_tmpname},
-  {NULL, NULL}
+static const luaR_entry syslib[] = {
+  {LRO_STRKEY("clock"),     LRO_FUNCVAL(os_clock)},
+  {LRO_STRKEY("date"),      LRO_FUNCVAL(os_date)},
+  {LRO_STRKEY("difftime"),  LRO_FUNCVAL(os_difftime)},
+  {LRO_STRKEY("execute"),   LRO_FUNCVAL(os_execute)},
+  {LRO_STRKEY("exit"),      LRO_FUNCVAL(os_exit)},
+  {LRO_STRKEY("getenv"),    LRO_FUNCVAL(os_getenv)},
+  {LRO_STRKEY("remove"),    LRO_FUNCVAL(os_remove)},
+  {LRO_STRKEY("rename"),    LRO_FUNCVAL(os_rename)},
+  {LRO_STRKEY("setlocale"), LRO_FUNCVAL(os_setlocale)},
+  {LRO_STRKEY("time"),      LRO_FUNCVAL(os_time)},
+  {LRO_STRKEY("tmpname"),   LRO_FUNCVAL(os_tmpname)},
+  {LRO_NILKEY, LRO_NILVAL}
 };
+
+static const luaR_table os_table = LUA_ROTABLE(syslib);
 
 /* }====================================================== */
 
 
 
 LUALIB_API int luaopen_os (lua_State *L) {
-  luaL_register(L, LUA_OSLIBNAME, syslib);
+  luaL_register_ro(L, LUA_OSLIBNAME, &os_table);
   return 1;
 }
 

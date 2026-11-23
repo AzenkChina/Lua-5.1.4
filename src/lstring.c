@@ -48,19 +48,26 @@ void luaS_resize (lua_State *L, int newsize) {
 
 
 static TString *newlstr (lua_State *L, const char *str, size_t l,
-                                       unsigned int h) {
+                                       unsigned int h, int readonly) {
   TString *ts;
   stringtable *tb;
-  if (l+1 > (MAX_SIZET - sizeof(TString))/sizeof(char))
+  if (!readonly && l+1 > (MAX_SIZET - sizeof(TString))/sizeof(char))
     luaM_toobig(L);
-  ts = cast(TString *, luaM_malloc(L, (l+1)*sizeof(char)+sizeof(TString)));
+  ts = cast(TString *, luaM_malloc(L, sizeof(TString) +
+           (readonly ? sizeof(char *) : (l+1)*sizeof(char))));
   ts->tsv.len = l;
   ts->tsv.hash = h;
   ts->tsv.marked = luaC_white(G(L));
   ts->tsv.tt = LUA_TSTRING;
   ts->tsv.reserved = 0;
-  memcpy(ts+1, str, l*sizeof(char));
-  ((char *)(ts+1))[l] = '\0';  /* ending 0 */
+  if (readonly) {
+    *(char **)(ts+1) = cast(char *, str);  /* keep pointer to read-only bytes */
+    luaS_readonly(ts);
+  }
+  else {
+    memcpy(ts+1, str, l*sizeof(char));
+    ((char *)(ts+1))[l] = '\0';  /* ending 0 */
+  }
   tb = &G(L)->strt;
   h = lmod(h, tb->size);
   ts->tsv.next = tb->hash[h];  /* chain new entry */
@@ -72,7 +79,8 @@ static TString *newlstr (lua_State *L, const char *str, size_t l,
 }
 
 
-TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
+static TString *luaS_newlstr_helper (lua_State *L, const char *str, size_t l,
+                                     int readonly) {
   GCObject *o;
   unsigned int h = cast(unsigned int, l);  /* seed */
   size_t step = (l>>5)+1;  /* if string is too long, don't hash all its chars */
@@ -89,7 +97,22 @@ TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
       return ts;
     }
   }
-  return newlstr(L, str, l, h);  /* not found */
+  return newlstr(L, str, l, h, readonly);  /* not found */
+}
+
+
+TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
+  return luaS_newlstr_helper(L, str, l, 0);
+}
+
+
+TString *luaS_newrolstr (lua_State *L, const char *str, size_t l) {
+  /* Only use a pointer-sized RO representation when it is really smaller
+  ** and the source is a NUL-terminated string with a stable lifetime. */
+  if (l+1 > sizeof(char *) && str[l] == '\0' && memchr(str, '\0', l) == NULL)
+    return luaS_newlstr_helper(L, str, l, 1);
+  else
+    return luaS_newlstr_helper(L, str, l, 0);
 }
 
 

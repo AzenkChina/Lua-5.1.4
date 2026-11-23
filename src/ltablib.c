@@ -14,6 +14,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lrotable.h"
 
 
 #define aux_getn(L,n)	(luaL_checktype(L, n, LUA_TTABLE), luaL_getn(L, n))
@@ -22,7 +23,7 @@
 static int foreachi (lua_State *L) {
   int i;
   int n = aux_getn(L, 1);
-  luaL_checktype(L, 2, LUA_TFUNCTION);
+  luaL_checkanyfunction(L, 2);
   for (i=1; i <= n; i++) {
     lua_pushvalue(L, 2);  /* function */
     lua_pushinteger(L, i);  /* 1st argument */
@@ -38,7 +39,7 @@ static int foreachi (lua_State *L) {
 
 static int foreach (lua_State *L) {
   luaL_checktype(L, 1, LUA_TTABLE);
-  luaL_checktype(L, 2, LUA_TFUNCTION);
+  luaL_checkanyfunction(L, 2);
   lua_pushnil(L);  /* first key */
   while (lua_next(L, 1)) {
     lua_pushvalue(L, 2);  /* function */
@@ -257,7 +258,7 @@ static int sort (lua_State *L) {
   int n = aux_getn(L, 1);
   luaL_checkstack(L, 40, "");  /* assume array is smaller than 2^40 */
   if (!lua_isnoneornil(L, 2))  /* is there a 2nd argument? */
-    luaL_checktype(L, 2, LUA_TFUNCTION);
+    luaL_checkanyfunction(L, 2);
   lua_settop(L, 2);  /* make sure there is two arguments */
   auxsort(L, 1, n);
   return 0;
@@ -266,22 +267,24 @@ static int sort (lua_State *L) {
 /* }====================================================== */
 
 
-static const luaL_Reg tab_funcs[] = {
-  {"concat", tconcat},
-  {"foreach", foreach},
-  {"foreachi", foreachi},
-  {"getn", getn},
-  {"maxn", maxn},
-  {"insert", tinsert},
-  {"remove", tremove},
-  {"setn", setn},
-  {"sort", sort},
-  {NULL, NULL}
+static const luaR_entry tab_funcs[] = {
+  {LRO_STRKEY("concat"), LRO_FUNCVAL(tconcat)},
+  {LRO_STRKEY("foreach"), LRO_FUNCVAL(foreach)},
+  {LRO_STRKEY("foreachi"), LRO_FUNCVAL(foreachi)},
+  {LRO_STRKEY("getn"), LRO_FUNCVAL(getn)},
+  {LRO_STRKEY("maxn"), LRO_FUNCVAL(maxn)},
+  {LRO_STRKEY("insert"), LRO_FUNCVAL(tinsert)},
+  {LRO_STRKEY("remove"), LRO_FUNCVAL(tremove)},
+  {LRO_STRKEY("setn"), LRO_FUNCVAL(setn)},
+  {LRO_STRKEY("sort"), LRO_FUNCVAL(sort)},
+  {LRO_NILKEY, LRO_NILVAL}
 };
+
+static const luaR_table tab_table = LUA_ROTABLE(tab_funcs);
 
 
 LUALIB_API int luaopen_table (lua_State *L) {
-  luaL_register(L, LUA_TABLIBNAME, tab_funcs);
+  luaL_register_ro(L, LUA_TABLIBNAME, &tab_table);
   return 1;
 }
 

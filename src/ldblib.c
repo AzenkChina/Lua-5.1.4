@@ -16,6 +16,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lrotable.h"
 
 
 
@@ -106,7 +107,7 @@ static int db_getinfo (lua_State *L) {
       return 1;
     }
   }
-  else if (lua_isfunction(L, arg+1)) {
+  else if (lua_isfunction(L, arg+1) || lua_islightfunction(L, arg+1)) {
     lua_pushfstring(L, ">%s", options);
     options = lua_tostring(L, -1);
     lua_pushvalue(L, arg+1);
@@ -371,27 +372,29 @@ static int db_errorfb (lua_State *L) {
 }
 
 
-static const luaL_Reg dblib[] = {
-  {"debug", db_debug},
-  {"getfenv", db_getfenv},
-  {"gethook", db_gethook},
-  {"getinfo", db_getinfo},
-  {"getlocal", db_getlocal},
-  {"getregistry", db_getregistry},
-  {"getmetatable", db_getmetatable},
-  {"getupvalue", db_getupvalue},
-  {"setfenv", db_setfenv},
-  {"sethook", db_sethook},
-  {"setlocal", db_setlocal},
-  {"setmetatable", db_setmetatable},
-  {"setupvalue", db_setupvalue},
-  {"traceback", db_errorfb},
-  {NULL, NULL}
+static const luaR_entry dblib[] = {
+  {LRO_STRKEY("debug"), LRO_FUNCVAL(db_debug)},
+  {LRO_STRKEY("getfenv"), LRO_FUNCVAL(db_getfenv)},
+  {LRO_STRKEY("gethook"), LRO_FUNCVAL(db_gethook)},
+  {LRO_STRKEY("getinfo"), LRO_FUNCVAL(db_getinfo)},
+  {LRO_STRKEY("getlocal"), LRO_FUNCVAL(db_getlocal)},
+  {LRO_STRKEY("getregistry"), LRO_FUNCVAL(db_getregistry)},
+  {LRO_STRKEY("getmetatable"), LRO_FUNCVAL(db_getmetatable)},
+  {LRO_STRKEY("getupvalue"), LRO_FUNCVAL(db_getupvalue)},
+  {LRO_STRKEY("setfenv"), LRO_FUNCVAL(db_setfenv)},
+  {LRO_STRKEY("sethook"), LRO_FUNCVAL(db_sethook)},
+  {LRO_STRKEY("setlocal"), LRO_FUNCVAL(db_setlocal)},
+  {LRO_STRKEY("setmetatable"), LRO_FUNCVAL(db_setmetatable)},
+  {LRO_STRKEY("setupvalue"), LRO_FUNCVAL(db_setupvalue)},
+  {LRO_STRKEY("traceback"), LRO_FUNCVAL(db_errorfb)},
+  {LRO_NILKEY, LRO_NILVAL}
 };
+
+static const luaR_table db_table = LUA_ROTABLE(dblib);
 
 
 LUALIB_API int luaopen_debug (lua_State *L) {
-  luaL_register(L, LUA_DBLIBNAME, dblib);
+  luaL_register_ro(L, LUA_DBLIBNAME, &db_table);
   return 1;
 }
 

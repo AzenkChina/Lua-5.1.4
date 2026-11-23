@@ -20,6 +20,7 @@
 #include "lstring.c"
 #include "ltable.c"
 #include "ltm.c"
+#include "lrotable.c"
 #include "lundump.c"
 #include "lvm.c"
 #include "lzio.c"

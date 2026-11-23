@@ -18,6 +18,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lrotable.h"
 
 
 /* macro to `unsign' a character */
@@ -146,7 +147,9 @@ static int writer (lua_State *L, const void* b, size_t size, void* B) {
 
 static int str_dump (lua_State *L) {
   luaL_Buffer b;
-  luaL_checktype(L, 1, LUA_TFUNCTION);
+  luaL_checkanyfunction(L, 1);
+  if (lua_iscfunction(L, 1))
+    return luaL_error(L, "unable to dump given function");
   lua_settop(L, 1);
   luaL_buffinit(L,&b);
   if (lua_dump(L, writer, &b) != 0)
@@ -618,7 +621,8 @@ static void add_value (MatchState *ms, luaL_Buffer *b, const char *s,
       add_s(ms, b, s, e);
       return;
     }
-    case LUA_TFUNCTION: {
+    case LUA_TFUNCTION:
+    case LUA_TLIGHTFUNCTION: {
       int n;
       lua_pushvalue(L, 3);
       n = push_captures(ms, s, e);
@@ -652,7 +656,8 @@ static int str_gsub (lua_State *L) {
   MatchState ms;
   luaL_Buffer b;
   luaL_argcheck(L, tr == LUA_TNUMBER || tr == LUA_TSTRING ||
-                   tr == LUA_TFUNCTION || tr == LUA_TTABLE, 3,
+                   tr == LUA_TFUNCTION || tr == LUA_TLIGHTFUNCTION ||
+                   tr == LUA_TTABLE, 3,
                       "string/function/table expected");
   luaL_buffinit(L, &b);
   ms.L = L;
@@ -822,48 +827,41 @@ static int str_format (lua_State *L) {
 }
 
 
-static const luaL_Reg strlib[] = {
-  {"byte", str_byte},
-  {"char", str_char},
-  {"dump", str_dump},
-  {"find", str_find},
-  {"format", str_format},
-  {"gfind", gfind_nodef},
-  {"gmatch", gmatch},
-  {"gsub", str_gsub},
-  {"len", str_len},
-  {"lower", str_lower},
-  {"match", str_match},
-  {"rep", str_rep},
-  {"reverse", str_reverse},
-  {"sub", str_sub},
-  {"upper", str_upper},
-  {NULL, NULL}
+static const luaR_table strlib_table;
+
+static const luaR_entry strlib[] = {
+  {LRO_STRKEY("byte"), LRO_FUNCVAL(str_byte)},
+  {LRO_STRKEY("char"), LRO_FUNCVAL(str_char)},
+  {LRO_STRKEY("dump"), LRO_FUNCVAL(str_dump)},
+  {LRO_STRKEY("find"), LRO_FUNCVAL(str_find)},
+  {LRO_STRKEY("format"), LRO_FUNCVAL(str_format)},
+#if defined(LUA_COMPAT_GFIND)
+  {LRO_STRKEY("gfind"), LRO_FUNCVAL(gmatch)},
+#else
+  {LRO_STRKEY("gfind"), LRO_FUNCVAL(gfind_nodef)},
+#endif
+  {LRO_STRKEY("gmatch"), LRO_FUNCVAL(gmatch)},
+  {LRO_STRKEY("gsub"), LRO_FUNCVAL(str_gsub)},
+  {LRO_STRKEY("len"), LRO_FUNCVAL(str_len)},
+  {LRO_STRKEY("lower"), LRO_FUNCVAL(str_lower)},
+  {LRO_STRKEY("match"), LRO_FUNCVAL(str_match)},
+  {LRO_STRKEY("rep"), LRO_FUNCVAL(str_rep)},
+  {LRO_STRKEY("reverse"), LRO_FUNCVAL(str_reverse)},
+  {LRO_STRKEY("sub"), LRO_FUNCVAL(str_sub)},
+  {LRO_STRKEY("upper"), LRO_FUNCVAL(str_upper)},
+  {LRO_STRKEY("__index"), LRO_ROVAL(&strlib_table)},
+  {LRO_NILKEY, LRO_NILVAL}
 };
 
+static const luaR_table strlib_table = LUA_ROTABLE(strlib);
 
-static void createmetatable (lua_State *L) {
-  lua_createtable(L, 0, 1);  /* create metatable for strings */
+
+LUALIB_API int luaopen_string (lua_State *L) {
+  luaL_register_ro(L, LUA_STRLIBNAME, &strlib_table);
   lua_pushliteral(L, "");  /* dummy string */
-  lua_pushvalue(L, -2);
+  lua_pushrotable(L, cast(void *, &strlib_table));
   lua_setmetatable(L, -2);  /* set string metatable */
   lua_pop(L, 1);  /* pop dummy string */
-  lua_pushvalue(L, -2);  /* string library... */
-  lua_setfield(L, -2, "__index");  /* ...is the __index metamethod */
-  lua_pop(L, 1);  /* pop metatable */
-}
-
-
-/*
-** Open string library
-*/
-LUALIB_API int luaopen_string (lua_State *L) {
-  luaL_register(L, LUA_STRLIBNAME, strlib);
-#if defined(LUA_COMPAT_GFIND)
-  lua_getfield(L, -1, "gmatch");
-  lua_setfield(L, -2, "gfind");
-#endif
-  createmetatable(L);
   return 1;
 }
 

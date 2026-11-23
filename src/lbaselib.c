@@ -18,6 +18,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lrotable.h"
 
 
 
@@ -104,7 +105,7 @@ static int luaB_getmetatable (lua_State *L) {
 static int luaB_setmetatable (lua_State *L) {
   int t = lua_type(L, 2);
   luaL_checktype(L, 1, LUA_TTABLE);
-  luaL_argcheck(L, t == LUA_TNIL || t == LUA_TTABLE, 2,
+  luaL_argcheck(L, t == LUA_TNIL || t == LUA_TTABLE || t == LUA_TROTABLE, 2,
                     "nil or table expected");
   if (luaL_getmetafield(L, 1, "__metatable"))
     luaL_error(L, "cannot change a protected metatable");
@@ -115,7 +116,7 @@ static int luaB_setmetatable (lua_State *L) {
 
 
 static void getfunc (lua_State *L, int opt) {
-  if (lua_isfunction(L, 1)) lua_pushvalue(L, 1);
+  if (lua_isfunction(L, 1) || lua_islightfunction(L, 1)) lua_pushvalue(L, 1);
   else {
     lua_Debug ar;
     int level = opt ? luaL_optint(L, 1, 1) : luaL_checkint(L, 1);
@@ -167,7 +168,7 @@ static int luaB_rawequal (lua_State *L) {
 
 
 static int luaB_rawget (lua_State *L) {
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   luaL_checkany(L, 2);
   lua_settop(L, 2);
   lua_rawget(L, 1);
@@ -175,7 +176,7 @@ static int luaB_rawget (lua_State *L) {
 }
 
 static int luaB_rawset (lua_State *L) {
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   luaL_checkany(L, 2);
   luaL_checkany(L, 3);
   lua_settop(L, 3);
@@ -224,7 +225,7 @@ static int luaB_type (lua_State *L) {
 
 
 static int luaB_next (lua_State *L) {
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   lua_settop(L, 2);  /* create a 2nd argument if there isn't one */
   if (lua_next(L, 1))
     return 2;
@@ -236,7 +237,7 @@ static int luaB_next (lua_State *L) {
 
 
 static int luaB_pairs (lua_State *L) {
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   lua_pushvalue(L, lua_upvalueindex(1));  /* return generator, */
   lua_pushvalue(L, 1);  /* state, */
   lua_pushnil(L);  /* and initial value */
@@ -246,7 +247,7 @@ static int luaB_pairs (lua_State *L) {
 
 static int ipairsaux (lua_State *L) {
   int i = luaL_checkint(L, 2);
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   i++;  /* next value */
   lua_pushinteger(L, i);
   lua_rawgeti(L, 1, i);
@@ -255,7 +256,7 @@ static int ipairsaux (lua_State *L) {
 
 
 static int luaB_ipairs (lua_State *L) {
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   lua_pushvalue(L, lua_upvalueindex(1));  /* return generator, */
   lua_pushvalue(L, 1);  /* state, */
   lua_pushinteger(L, 0);  /* and initial value */
@@ -341,7 +342,7 @@ static int luaB_assert (lua_State *L) {
 
 static int luaB_unpack (lua_State *L) {
   int i, e, n;
-  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_checkanytable(L, 1);
   i = luaL_optint(L, 2, 1);
   e = luaL_opt(L, luaL_checkint, 3, luaL_getn(L, 1));
   if (i > e) return 0;  /* empty range */
@@ -602,15 +603,17 @@ static int luaB_corunning (lua_State *L) {
 }
 
 
-static const luaL_Reg co_funcs[] = {
-  {"create", luaB_cocreate},
-  {"resume", luaB_coresume},
-  {"running", luaB_corunning},
-  {"status", luaB_costatus},
-  {"wrap", luaB_cowrap},
-  {"yield", luaB_yield},
-  {NULL, NULL}
+static const luaR_entry co_funcs[] = {
+  {LRO_STRKEY("create"), LRO_FUNCVAL(luaB_cocreate)},
+  {LRO_STRKEY("resume"), LRO_FUNCVAL(luaB_coresume)},
+  {LRO_STRKEY("running"), LRO_FUNCVAL(luaB_corunning)},
+  {LRO_STRKEY("status"), LRO_FUNCVAL(luaB_costatus)},
+  {LRO_STRKEY("wrap"), LRO_FUNCVAL(luaB_cowrap)},
+  {LRO_STRKEY("yield"), LRO_FUNCVAL(luaB_yield)},
+  {LRO_NILKEY, LRO_NILVAL}
 };
+
+static const luaR_table co_table = LUA_ROTABLE(co_funcs);
 
 /* }====================================================== */
 
@@ -627,8 +630,15 @@ static void base_open (lua_State *L) {
   /* set global _G */
   lua_pushvalue(L, LUA_GLOBALSINDEX);
   lua_setglobal(L, "_G");
-  /* open lib into global table */
-  luaL_register(L, "_G", base_funcs);
+  /* open base functions as lightfunctions in the (writable) global table */
+  lua_pushvalue(L, LUA_GLOBALSINDEX);
+  {
+    const luaL_Reg *l;
+    for (l = base_funcs; l->name; l++) {
+      lua_pushlightfunction(L, cast(void *, l->func));
+      lua_setfield(L, -2, l->name);
+    }
+  }
   lua_pushliteral(L, LUA_VERSION);
   lua_setglobal(L, "_VERSION");  /* set global _VERSION */
   /* `ipairs' and `pairs' need auxliliary functions as upvalues */
@@ -647,7 +657,7 @@ static void base_open (lua_State *L) {
 
 LUALIB_API int luaopen_base (lua_State *L) {
   base_open(L);
-  luaL_register(L, LUA_COLIBNAME, co_funcs);
+  luaL_register_ro(L, LUA_COLIBNAME, &co_table);
   return 2;
 }
 

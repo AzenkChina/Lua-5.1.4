@@ -15,6 +15,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lrotable.h"
 
 
 #undef PI
@@ -212,52 +213,51 @@ static int math_randomseed (lua_State *L) {
 }
 
 
-static const luaL_Reg mathlib[] = {
-  {"abs",   math_abs},
-  {"acos",  math_acos},
-  {"asin",  math_asin},
-  {"atan2", math_atan2},
-  {"atan",  math_atan},
-  {"ceil",  math_ceil},
-  {"cosh",   math_cosh},
-  {"cos",   math_cos},
-  {"deg",   math_deg},
-  {"exp",   math_exp},
-  {"floor", math_floor},
-  {"fmod",   math_fmod},
-  {"frexp", math_frexp},
-  {"ldexp", math_ldexp},
-  {"log10", math_log10},
-  {"log",   math_log},
-  {"max",   math_max},
-  {"min",   math_min},
-  {"modf",   math_modf},
-  {"pow",   math_pow},
-  {"rad",   math_rad},
-  {"random",     math_random},
-  {"randomseed", math_randomseed},
-  {"sinh",   math_sinh},
-  {"sin",   math_sin},
-  {"sqrt",  math_sqrt},
-  {"tanh",   math_tanh},
-  {"tan",   math_tan},
-  {NULL, NULL}
+static const luaR_entry math_map[] = {
+  {LRO_STRKEY("abs"),   LRO_FUNCVAL(math_abs)},
+  {LRO_STRKEY("acos"),  LRO_FUNCVAL(math_acos)},
+  {LRO_STRKEY("asin"),  LRO_FUNCVAL(math_asin)},
+  {LRO_STRKEY("atan2"), LRO_FUNCVAL(math_atan2)},
+  {LRO_STRKEY("atan"),  LRO_FUNCVAL(math_atan)},
+  {LRO_STRKEY("ceil"),  LRO_FUNCVAL(math_ceil)},
+  {LRO_STRKEY("cosh"),  LRO_FUNCVAL(math_cosh)},
+  {LRO_STRKEY("cos"),   LRO_FUNCVAL(math_cos)},
+  {LRO_STRKEY("deg"),   LRO_FUNCVAL(math_deg)},
+  {LRO_STRKEY("exp"),   LRO_FUNCVAL(math_exp)},
+  {LRO_STRKEY("floor"), LRO_FUNCVAL(math_floor)},
+  {LRO_STRKEY("fmod"),  LRO_FUNCVAL(math_fmod)},
+#if defined(LUA_COMPAT_MOD)
+  {LRO_STRKEY("mod"),   LRO_FUNCVAL(math_fmod)},
+#endif
+  {LRO_STRKEY("frexp"), LRO_FUNCVAL(math_frexp)},
+  {LRO_STRKEY("ldexp"), LRO_FUNCVAL(math_ldexp)},
+  {LRO_STRKEY("log10"), LRO_FUNCVAL(math_log10)},
+  {LRO_STRKEY("log"),   LRO_FUNCVAL(math_log)},
+  {LRO_STRKEY("max"),   LRO_FUNCVAL(math_max)},
+  {LRO_STRKEY("min"),   LRO_FUNCVAL(math_min)},
+  {LRO_STRKEY("modf"),  LRO_FUNCVAL(math_modf)},
+  {LRO_STRKEY("pow"),   LRO_FUNCVAL(math_pow)},
+  {LRO_STRKEY("rad"),   LRO_FUNCVAL(math_rad)},
+  {LRO_STRKEY("random"),     LRO_FUNCVAL(math_random)},
+  {LRO_STRKEY("randomseed"), LRO_FUNCVAL(math_randomseed)},
+  {LRO_STRKEY("sinh"),  LRO_FUNCVAL(math_sinh)},
+  {LRO_STRKEY("sin"),   LRO_FUNCVAL(math_sin)},
+  {LRO_STRKEY("sqrt"),  LRO_FUNCVAL(math_sqrt)},
+  {LRO_STRKEY("tanh"),  LRO_FUNCVAL(math_tanh)},
+  {LRO_STRKEY("tan"),   LRO_FUNCVAL(math_tan)},
+  {LRO_STRKEY("pi"),    LRO_NUMVAL(PI)},
+  {LRO_STRKEY("huge"),  LRO_NUMVAL(HUGE_VAL)},
+  {LRO_NILKEY, LRO_NILVAL}
 };
+
+static const luaR_table math_table = LUA_ROTABLE(math_map);
 
 
 /*
 ** Open math library
 */
 LUALIB_API int luaopen_math (lua_State *L) {
-  luaL_register(L, LUA_MATHLIBNAME, mathlib);
-  lua_pushnumber(L, PI);
-  lua_setfield(L, -2, "pi");
-  lua_pushnumber(L, HUGE_VAL);
-  lua_setfield(L, -2, "huge");
-#if defined(LUA_COMPAT_MOD)
-  lua_getfield(L, -1, "fmod");
-  lua_setfield(L, -2, "mod");
-#endif
+  luaL_register_ro(L, LUA_MATHLIBNAME, &math_table);
   return 1;
 }
 
